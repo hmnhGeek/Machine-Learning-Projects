@@ -2,7 +2,7 @@ from faster_whisper import WhisperModel
 
 
 class SpeechToTextService:
-    def __init__(self, model_size: str = "small", device: str = "cpu"):
+    def __init__(self, model_size: str = "tiny", device: str = "cpu"):
         self.model = WhisperModel(
             model_size, device=device, compute_type="int8")
 
@@ -16,6 +16,7 @@ class SpeechToTextService:
         Returns:
             str: The transcribed text.
         """
+        print("Transcribing the audio file...")
         segments, _ = self.model.transcribe(
             audio_file_path, beam_size=5, vad_filter=True)
         return " ".join(segment.text for segment in segments)
