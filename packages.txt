@@ -21,3 +21,4 @@ libxrandr2
 libgbm1
 libxshmfence1
 libdrm2
+ffmpeg
