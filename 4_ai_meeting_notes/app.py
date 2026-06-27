@@ -1,172 +1,180 @@
 import os
 import tempfile
 
-import gradio as gr
+import streamlit as st
 
 from services.model_service import ModelService
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 
+# -----------------------------------------------------------------------------
+# Page Config
+# -----------------------------------------------------------------------------
+st.set_page_config(
+    page_title="AI Meeting Assistant",
+    page_icon="🎙️",
+    layout="wide",
+)
+
+st.title("🎙️ AI Meeting Assistant")
+st.write(
+    "Upload a meeting recording to automatically generate a summary and chat with the transcript."
+)
 
 # -----------------------------------------------------------------------------
-# Upload Audio
+# Session State
 # -----------------------------------------------------------------------------
-def process_audio(audio_file, state):
-    if audio_file is None:
-        return (
-            state,
-            "",
-            [],
-            gr.Tabs(visible=False),
-        )
+if "model_service" not in st.session_state:
+    st.session_state.model_service = None
 
-    if os.path.getsize(audio_file) > MAX_FILE_SIZE:
-        raise gr.Error("Please upload an audio file smaller than 100 MB.")
+if "summary" not in st.session_state:
+    st.session_state.summary = ""
 
-    filename = os.path.basename(audio_file)
+if "summary_generated" not in st.session_state:
+    st.session_state.summary_generated = False
 
-    if (
-        state is not None
-        and state.get("uploaded_file_name") == filename
-    ):
-        return (
-            state,
-            state["summary"],
-            [],
-            gr.Tabs(
-                visible=True,
-                selected=0,
-            ),
-        )
+if "uploaded_file_name" not in st.session_state:
+    st.session_state.uploaded_file_name = None
 
-    suffix = os.path.splitext(filename)[1]
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    with tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=suffix,
-    ) as temp_file:
+# -----------------------------------------------------------------------------
+# Sidebar
+# -----------------------------------------------------------------------------
+with st.sidebar:
 
-        with open(audio_file, "rb") as f:
-            temp_file.write(f.read())
+    st.header("Meeting")
 
-        temp_path = temp_file.name
-
-    try:
-        model_service = ModelService(temp_path)
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-    state = {
-        "model_service": model_service,
-        "summary": "",
-        "summary_generated": False,
-        "uploaded_file_name": filename,
-    }
-
-    return (
-        state,
-        "### ⏳ Generating summary...",
-        [],
-        gr.Tabs(
-            visible=True,
-            selected=0,
-        ),
+    uploaded_file = st.file_uploader(
+        "Upload Audio",
+        type=["mp3", "wav", "m4a"],
     )
 
-
-# -----------------------------------------------------------------------------
-# Summary Generator
-# -----------------------------------------------------------------------------
-def generate_summary(state):
-    if state is None:
-        yield ""
-        return
-
-    if state["summary_generated"]:
-        yield state["summary"]
-        return
-
-    summary = ""
-
-    for chunk in state["model_service"].summarize():
-        summary = chunk
-        yield summary
-
-    state["summary"] = summary
-    state["summary_generated"] = True
-
-
-# -----------------------------------------------------------------------------
-# Chat
-# -----------------------------------------------------------------------------
-def chat(message, history, state):
-    if state is None:
-        raise gr.Error("Please upload an audio file first.")
-
-    response = ""
-
-    for chunk in state["model_service"].chat(message, history):
-        response = chunk
-        yield response
-
-
-# -----------------------------------------------------------------------------
-# UI
-# -----------------------------------------------------------------------------
-with gr.Blocks(title="AI Meeting Assistant") as demo:
-
-    gr.Markdown("# 🎙️ AI Meeting Assistant")
-    gr.Markdown(
-        "Upload a meeting recording to automatically generate a summary and chat with the transcript."
-    )
-
-    state = gr.State(None)
-
-    audio = gr.File(
-        label="Upload Audio",
-        file_types=[".mp3", ".wav", ".m4a"],
-        type="filepath",
-    )
-
-    with gr.Tabs() as tabs:
-
-        with gr.Tab("📝 Meeting Summary"):
-            summary_box = gr.Markdown(
-                "Upload an audio file to begin."
-            )
-
-        with gr.Tab("💬 Chat with Meeting"):
-
-            chatbot = gr.Chatbot(
-                type="messages",
-                height=500,
-            )
-
-            gr.ChatInterface(
-                fn=chat,
-                chatbot=chatbot,
-                additional_inputs=[state],
-                type="messages",
-            )
-
-    (
-        audio.upload(
-            fn=process_audio,
-            inputs=[audio, state],
-            outputs=[
-                state,
-                summary_box,
-                chatbot,
-                tabs,
+    if st.session_state.model_service is not None:
+        page = st.radio(
+            "Navigate",
+            [
+                "📝 Meeting Summary",
+                "💬 Chat with Meeting",
             ],
         )
-        .then(
-            fn=generate_summary,
-            inputs=state,
-            outputs=summary_box,
-            show_progress="minimal",
-        )
-    )
+    else:
+        page = None
 
-demo.launch()
+# -----------------------------------------------------------------------------
+# Process Upload
+# -----------------------------------------------------------------------------
+if uploaded_file is not None:
+
+    if uploaded_file.size > MAX_FILE_SIZE:
+        st.error("Please upload an audio file smaller than 100 MB.")
+        st.stop()
+
+    filename = uploaded_file.name
+
+    if st.session_state.uploaded_file_name != filename:
+
+        suffix = os.path.splitext(filename)[1]
+
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=suffix,
+        ) as temp_file:
+
+            temp_file.write(uploaded_file.getbuffer())
+            temp_path = temp_file.name
+
+        with st.spinner("Loading meeting..."):
+
+            try:
+                model_service = ModelService(temp_path)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+        st.session_state.model_service = model_service
+        st.session_state.summary = ""
+        st.session_state.summary_generated = False
+        st.session_state.uploaded_file_name = filename
+        st.session_state.messages = []
+
+        st.rerun()
+
+# -----------------------------------------------------------------------------
+# No Upload Yet
+# -----------------------------------------------------------------------------
+if st.session_state.model_service is None:
+    st.info("Upload an audio file from the sidebar to begin.")
+    st.stop()
+
+# -----------------------------------------------------------------------------
+# Summary Page
+# -----------------------------------------------------------------------------
+if page == "📝 Meeting Summary":
+
+    st.header("📝 Meeting Summary")
+
+    summary_placeholder = st.empty()
+
+    if not st.session_state.summary_generated:
+
+        with st.spinner("Generating summary..."):
+
+            summary = ""
+
+            for chunk in st.session_state.model_service.summarize():
+                summary = chunk
+                summary_placeholder.markdown(summary)
+
+            st.session_state.summary = summary
+            st.session_state.summary_generated = True
+
+    else:
+        summary_placeholder.markdown(st.session_state.summary)
+
+# -----------------------------------------------------------------------------
+# Chat Page
+# -----------------------------------------------------------------------------
+elif page == "💬 Chat with Meeting":
+
+    st.header("💬 Chat with Meeting")
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    prompt = st.chat_input("Ask something about the meeting...")
+
+    if prompt:
+
+        st.session_state.messages.append(
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        )
+
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+
+            placeholder = st.empty()
+            response = ""
+
+            history = st.session_state.messages[:-1]
+
+            for chunk in st.session_state.model_service.chat(
+                prompt,
+                history,
+            ):
+                response = chunk
+                placeholder.markdown(response)
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": response,
+            }
+        )

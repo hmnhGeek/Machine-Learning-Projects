@@ -14,20 +14,8 @@ class ModelService:
         self.system_prompt = PromptService.get_system_prompt(self.transcript)
 
     def chat(self, message, history):
-        messages = [{"role": "system", "content": self.system_prompt}]
-        for msg in history:
-            messages.append(
-                {
-                    "role": msg["role"],
-                    "content": msg["content"],
-                }
-            )
-        messages.append(
-            {
-                "role": "user",
-                "content": message,
-            }
-        )
+        messages = [{"role": "system", "content": PromptService.get_system_prompt(
+            self.transcript)}] + history + [{"role": "user", "content": message}]
         stream = self.client.chat.completions.create(
             model=self.model, messages=messages, stream=True)
         response = ""
