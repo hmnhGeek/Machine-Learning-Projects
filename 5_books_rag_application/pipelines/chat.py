@@ -9,13 +9,12 @@ from langchain_core.documents import Document
 MODEL = "gemma3:1b"
 DB_NAME = str(Path(__file__).parent.parent / "bookstore_vector_db")
 
-# embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 RETRIEVAL_K = 10
 
 SYSTEM_PROMPT = """
 You are a knowledgeable, friendly assistant representing the knowledge from a collection of ebooks.
-You are chatting with a user about the ebooks.
+You are chatting with a user about the following book.
 If relevant, use the given context to answer any question.
 If you don't know the answer, say so.
 Context:

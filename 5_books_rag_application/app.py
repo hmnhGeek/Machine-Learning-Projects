@@ -25,7 +25,8 @@ def main():
     theme = gr.themes.Soft(font=["Inter", "system-ui", "sans-serif"])
 
     with gr.Blocks(title="EBook Expert Assistant", theme=theme) as ui:
-        gr.Markdown("# 🏢 EBook Expert Assistant\nAsk me anything!")
+        gr.Markdown(
+            "# 📖 EBook Expert Assistant\nAsk me anything about your book!")
 
         with gr.Row():
             with gr.Column(scale=1):
