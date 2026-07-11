@@ -22,6 +22,16 @@ knowledge-base/          # Place your .epub files here
 bookstore_vector_db/     # Local vector database created by ingestion
 ```
 
+## Architectural Diagram
+
+### Ingestion pipeline
+
+![Ingestion Pipeline](assets/ingestion-pipeline.png)
+
+### Chat pipeline
+
+![Chat Pipeline](assets/chat-pipeline.png)
+
 ## Prerequisites
 
 Before installing the app, make sure you have:
