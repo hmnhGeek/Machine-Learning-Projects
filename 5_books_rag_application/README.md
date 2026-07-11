@@ -86,7 +86,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 5. Install the required Python packages:
 
 ```powershell
-uv pip install gradio langchain-ollama langchain-chroma langchain-huggingface langchain-community langchain-text-splitters unstructured
+uv add gradio langchain-ollama langchain-chroma langchain-huggingface langchain-community langchain-text-splitters unstructured
 ```
 
 ### Option 2: Install with pip
@@ -110,7 +110,7 @@ The ingestion script reads all EPUB files from `knowledge-base`, splits them int
 Run:
 
 ```powershell
-uv run python pipelines/ingest.py
+uv run pipelines/ingest.py
 ```
 
 If you used `pip` instead of `uv`, use:
@@ -130,7 +130,7 @@ Ingestion complete
 Start the Gradio interface:
 
 ```powershell
-uv run python app.py
+uv run app.py
 ```
 
 Or with `pip`:
