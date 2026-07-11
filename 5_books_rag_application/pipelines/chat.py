@@ -35,13 +35,16 @@ def combined_question(question: str, history: list[dict] = []) -> str:
     return prior + "\n" + question
 
 
-def answer_question(question: str, history: list[dict] = []) -> tuple[str, list[Document]]:
+def stream_answer_question(question: str, history: list[dict] = []):
     combined = combined_question(question, history)
     docs = fetch_context(combined)
     context = "\n\n".join(doc.page_content for doc in docs)
+
     system_prompt = SYSTEM_PROMPT.format(context=context)
     messages = [SystemMessage(content=system_prompt)]
     messages.extend(convert_to_messages(history))
     messages.append(HumanMessage(content=question))
-    response = llm.invoke(messages)
-    return response.content, docs
+
+    for chunk in llm.stream(messages):
+        if hasattr(chunk, "content") and chunk.content:
+            yield chunk.content, docs

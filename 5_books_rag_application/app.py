@@ -1,5 +1,5 @@
 import gradio as gr
-from pipelines.chat import answer_question
+from pipelines.chat import stream_answer_question
 
 
 def format_context(context):
@@ -13,9 +13,12 @@ def format_context(context):
 def chat(history):
     last_message = history[-1]["content"]
     prior = history[:-1]
-    answer, context = answer_question(last_message, prior)
-    history.append({"role": "assistant", "content": answer})
-    return history, format_context(context)
+
+    history.append({"role": "assistant", "content": ""})
+
+    for chunk, docs in stream_answer_question(last_message, prior):
+        history[-1]["content"] += chunk
+        yield history, format_context(docs)
 
 
 def main():
