@@ -1,0 +1,50 @@
+from pathlib import Path
+from langchain_ollama import ChatOllama
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.messages import SystemMessage, HumanMessage, convert_to_messages
+from langchain_core.documents import Document
+
+
+MODEL = "gemma3:1b"
+DB_NAME = str(Path(__file__).parent.parent / "bookstore_vector_db")
+
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+RETRIEVAL_K = 10
+
+SYSTEM_PROMPT = """
+You are a knowledgeable, friendly assistant representing the knowledge from a collection of ebooks.
+You are chatting with a user about the following book.
+If relevant, use the given context to answer any question.
+If you don't know the answer, say so.
+Context:
+{context}
+"""
+
+vectorstore = Chroma(persist_directory=DB_NAME, embedding_function=embeddings)
+retriever = vectorstore.as_retriever()
+llm = ChatOllama(temperature=0, model=MODEL)
+
+
+def fetch_context(question: str) -> list[Document]:
+    return retriever.invoke(question, k=RETRIEVAL_K)
+
+
+def combined_question(question: str, history: list[dict] = []) -> str:
+    prior = "\n".join(m["content"] for m in history if m["role"] == "user")
+    return prior + "\n" + question
+
+
+def stream_answer_question(question: str, history: list[dict] = []):
+    combined = combined_question(question, history)
+    docs = fetch_context(combined)
+    context = "\n\n".join(doc.page_content for doc in docs)
+
+    system_prompt = SYSTEM_PROMPT.format(context=context)
+    messages = [SystemMessage(content=system_prompt)]
+    messages.extend(convert_to_messages(history))
+    messages.append(HumanMessage(content=question))
+
+    for chunk in llm.stream(messages):
+        if hasattr(chunk, "content") and chunk.content:
+            yield chunk.content, docs
